@@ -1,0 +1,35 @@
+#!/bin/sh
+# vim: set ft=sh
+
+set -e
+
+exec 3>&1 # move stdout to 3 for returning our output
+exec 1>&2 # redirect normal output to stderr for logging
+source $(dirname $0)/common.sh
+
+main(){
+  destination=$1
+  request=$(mktemp /tmp/counter-request.XXXXXX)
+  cat > $request <&0
+  number=$(jq -r '.version.number // -1' < $request)
+  newNumber=$(process $request $number)
+  echo $newNumber > $destination/number
+  jq -M -n "{
+    version: {
+      number: $(echo $number | jq -R .)
+    },
+    metadata: [
+      {
+         name:  $(echo "number" | jq -R .),
+         value: $(echo $number | jq -R .)
+      }
+    ]
+  }" >&3
+}
+
+if [ -z "$1" ]; then
+  echo "usage: $0 <path/to/destination>" >&2
+  exit 1
+fi
+
+main $1 
